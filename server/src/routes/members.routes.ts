@@ -16,7 +16,7 @@ function getExpiryDate(startDate: Date, type: MembershipType): string {
 
 function generateMemberCode(db: ReturnType<typeof getDb>): string {
   const row = db.prepare('SELECT COUNT(*) as n FROM members').get() as { n: number }
-  return 'PF-' + String(row.n + 1).padStart(6, '0')
+  return '316-' + String(row.n + 1).padStart(6, '0')
 }
 
 // Empty query returns every member (used by the Members screen to list everyone).

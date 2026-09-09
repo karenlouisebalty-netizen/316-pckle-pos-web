@@ -3,9 +3,9 @@ export function formatPeso(amount: number): string {
   return 'P' + Number(amount).toFixed(2)
 }
 
-/** Generate a sequential receipt number: PF-000001 */
+/** Generate a sequential receipt number: 316-000001 */
 export function generateReceiptNumber(seq: number): string {
-  return 'PF-' + String(seq).padStart(6, '0')
+  return '316-' + String(seq).padStart(6, '0')
 }
 
 /** Today as YYYY-MM-DD string */
