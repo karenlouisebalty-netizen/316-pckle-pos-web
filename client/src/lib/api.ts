@@ -72,6 +72,8 @@ export const api = {
   createProduct:    (data: { branch_id: string; name: string; category: ProductCategory; price: number; track_inventory: boolean; stock_qty?: number; low_stock_threshold?: number; sku?: string }) => request<Product>('POST', '/pos/products', data),
   getTransaction:   (id: string)                       => request<Transaction>('GET', `/pos/transactions/${id}`),
   listTransactions: (branchId: string, dateFrom: string, dateTo?: string) => request<Transaction[]>('GET', `/pos/transactions${qs({ branchId, dateFrom, dateTo: dateTo ?? dateFrom })}`),
+  // Any signed-in role — flips a credit/unpaid sale to paid once the money actually comes in.
+  markTransactionPaid: (txnId: string) => request<Transaction>('POST', `/pos/transactions/${txnId}/mark-paid`),
 
   // ── Inventory ──
   stockIn:  (productId: string, qty: number, cost?: number, reason?: string) => request<void>('POST', '/inventory/stock-in', { productId, qty, cost, reason }),
@@ -112,6 +114,9 @@ export const api = {
 
   // ── Reports ──
   getDailySummary:  (branchId: string, dateFrom: string, dateTo: string) => request<DailySummary>('GET', `/reports/daily${qs({ branchId, dateFrom, dateTo })}`),
+  // Cashier-accessible — always today, server-computed (see reports.routes.ts). Used by the
+  // Daily Sales screen so staff can check the drawer without seeing revenue history.
+  getTodaySummary:  (branchId: string) => request<DailySummary>('GET', `/reports/today${qs({ branchId })}`),
 
   // ── Auth ──
   login: async (userId: string, pin: string): Promise<Session> => {
@@ -151,6 +156,9 @@ export const api = {
   // owner session (e.g. the Attendance screen), passed when called pre-auth.
   changeStaffPin: (userId: string, pin: string, ownerToken?: string) =>
     request<{ success: boolean }>('PATCH', `/auth/users/${userId}/pin`, { pin }, ownerToken ? { overrideToken: ownerToken } : undefined),
+  // Called from the Attendance screen, which already requires an owner session — no ownerToken needed.
+  setStaffDailyRate: (userId: string, dailyRate: number) =>
+    request<{ success: boolean }>('PATCH', `/auth/users/${userId}/rate`, { dailyRate }),
 
   // ── Settings ──
   getSetting: (key: string) => request<{ value: string | null }>('GET', `/settings/${key}`).then(r => r.value),

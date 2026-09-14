@@ -41,14 +41,35 @@ posRoutes.post('/transactions/:id/void', requireAuth, requireRole('owner'), (req
   }
 })
 
+// Any authenticated role — whoever's on the register is trusted to confirm money that was
+// owed has now actually come in, same as they're trusted to take payment in the first place.
+posRoutes.post('/transactions/:id/mark-paid', requireAuth, (req, res) => {
+  try {
+    const txn = TransactionService.markPaid(req.params.id, req.session!.user_id)
+    res.json(txn)
+  } catch (e: any) {
+    res.status(400).json({ error: e.message || 'Failed to mark as paid' })
+  }
+})
+
 posRoutes.get('/transactions/:id', requireAuth, (req, res) => {
   const txn = TransactionService.getById(req.params.id)
   if (!txn) return res.status(404).json({ error: 'Transaction not found' })
   res.json(txn)
 })
 
+// A cashier can only ever get today's transactions here (their own Daily Sales screen
+// reads this) — the date params are ignored for that role, computed as today() server-side
+// instead, so this can't be used to pull historical/monthly revenue even by calling the
+// API directly with a spoofed date range. Manager/owner keep full date-range access.
 posRoutes.get('/transactions', requireAuth, (req, res) => {
-  const { branchId, dateFrom, dateTo } = req.query as Record<string, string>
+  const { branchId } = req.query as Record<string, string>
+  let { dateFrom, dateTo } = req.query as Record<string, string>
+  if (req.session!.role === 'cashier') {
+    const today = new Date().toISOString().slice(0, 10)
+    dateFrom = today
+    dateTo = today
+  }
   res.json(TransactionService.listByDate(branchId, dateFrom, dateTo))
 })
 
