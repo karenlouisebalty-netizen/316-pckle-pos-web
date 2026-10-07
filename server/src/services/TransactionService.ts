@@ -34,8 +34,8 @@ export const TransactionService = {
 
     const txnId = uuid()
     const liveNow = nowISO()
-    // A custom date (manager/owner only — enforced by the route, which strips these fields
-    // for any other role before it gets here) swaps in the date/time the person typed in, so
+    // A custom date (any role — owner, manager, or cashier) swaps in the date/time the
+    // person typed in, so
     // `date(created_at)` — what every report query buckets by — lands on that day instead of
     // today. A PAST moment backdates the sale (a forgotten entry); a FUTURE one makes it an
     // advance payment (money collected today for a sale that lands in that future date's
@@ -67,6 +67,13 @@ export const TransactionService = {
     const paymentStatus = payload.payment_status ?? 'paid'
     const paidAt = paymentStatus === 'paid' ? now : null
     const paidBy = paymentStatus === 'paid' ? payload.cashier_id : null
+    // An unpaid sale is useless for follow-up without knowing who still owes for it — with
+    // several sitting in Reports/Daily Sales at once there'd be no way to tell them apart.
+    // Required here (not just in the UI) so a direct API call can't skip it either.
+    const debtorName = (payload.debtor_name ?? '').trim() || null
+    if (paymentStatus === 'unpaid' && !debtorName) {
+      throw new Error('Please enter who this unpaid sale is for.')
+    }
 
     // Open Play / Court Rental lines need one name per unit of quantity — validated up front,
     // before anything is written, so a bad request fails clean instead of half-committing.
@@ -85,11 +92,11 @@ export const TransactionService = {
       db.prepare(`
         INSERT INTO transactions
           (id, branch_id, cashier_id, customer_id, receipt_number, subtotal, discount_total, total, notes,
-           payment_status, paid_at, paid_by, is_backdated, is_advance_payment, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           payment_status, paid_at, paid_by, is_backdated, is_advance_payment, debtor_name, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(txnId, payload.branch_id, payload.cashier_id, payload.customer_id ?? null,
               receiptNumber, subtotal, discountTotal, total, payload.notes ?? null,
-              paymentStatus, paidAt, paidBy, isBackdated ? 1 : 0, isAdvancePayment ? 1 : 0, now, liveNow)
+              paymentStatus, paidAt, paidBy, isBackdated ? 1 : 0, isAdvancePayment ? 1 : 0, debtorName, now, liveNow)
 
       for (const item of payload.items) {
         const itemId = uuid()
